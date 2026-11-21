@@ -1,0 +1,17 @@
+{
+  "name": "メジャー監督",
+  "short_name": "メジャー監督",
+  "description": "30球団のメジャーリーグで、育てて、稼いで、ユニバースシリーズ制覇を目指す野球の監督ゲーム",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#eef2f7",
+  "theme_color": "#0f3d6e",
+  "lang": "ja",
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}
