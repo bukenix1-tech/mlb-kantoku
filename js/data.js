@@ -298,6 +298,7 @@ const ROSTER_MAX = FORTY_MAX + MINOR_MAX;     // 球団の選手の数の上限�
 const ROSTER_MIN = 75;                        // ほかの球団は、これを下回ると選手を足す（仮・AI）
 const REREGISTER = { B: 10, P: 15 };          // マイナーに下ろしたら、この日数は戻せない（投手は 15 日）
 const OPTION_YEARS = 3;                       // 40 人枠の選手をマイナーへ下ろせるのは 3 シーズンまで
+const OPTION_PER_SEASON = 5;                  // 1 シーズンにマイナーへ下ろせるのは 5 回まで（本物の決まり。2022 年から）
 const IL60_DAYS = 60;                         // これより長いケガは 60 日の負傷者リスト（40 人枠を空けられる）
 const BIG_INJ_CHANCE = 0.04, BIG_INJ_DAYS = [60, 200]; // ケガのうち、長引く大ケガになる割合と日数（仮・AI）
 // マイナーの階層（3A・2A・1A）。q：その階層のふつうの力。grow：25 歳以下の伸びの倍。力が q より LEVEL_LOW 以上足りないと、伸びが LEVEL_LOW_MUL 倍に落ちる（仮・AI）

@@ -2,7 +2,7 @@
 
 // 一度開いたら、電波がなくても遊べるようにする（ゲームのファイルをスマホに取っておく）
 // ファイルを直したら CACHE の番号を上げる
-const CACHE = 'mlbm-v1';
+const CACHE = 'mlbm-v2';
 const CACHE_PREFIX = 'mlbm-'; // 同じサイトに置いたペナント監督の取っておいた分は消さない
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/style.css',

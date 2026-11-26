@@ -3,7 +3,7 @@
 // 1 試合を 1 打席ずつ計算する
 
 function newRec(p, start, lead) {
-  return { p, start, outs: 0, pc: 0, h: 0, r: 0, bb: 0, k: 0, hr: 0, entryLead: lead };
+  return { p, start, outs: 0, pc: 0, h: 0, r: 0, bb: 0, k: 0, hr: 0, bf: 0, entryLead: lead };
 }
 
 function prepareSide(S, team, idx) {
@@ -87,6 +87,8 @@ function changePitcher(g, fld, bat, inning, atStart) {
   const setupAvail = fld.setup && !fld.used.some(r => r.p === fld.setup);
   let change = false;
   const lim = pitchLimit(rec);
+  // 3 人以上の打者と対戦するか、その回を投げ終えるまでは代えない（本物の決まり。2020 年から）
+  if (!atStart && rec.bf < 3) return;
   // ノーヒットノーランを続けている先発は、球数が多少かさんでも代えない（勝ちパターンにもつながない）
   const nono = rec.start && inning >= 6 && !rec.h && !rec.r;
   if (nono) { if (rec.pc >= lim + NONO_EXTRA) change = true; else return; }
@@ -137,6 +139,11 @@ function halfInning(g, bat, fld, inning) {
     if (slot) { slot.p.stats.rbi++; slot.box.rbi++; }
   };
   changePitcher(g, fld, bat, inning, true);
+  // 延長（10 回から）は、前の回の最後の打者を二塁に置いて始める。レギュラーシーズンだけ（本物の決まり。2023 年から常に）
+  if (g.ghost && inning >= 10) {
+    const gs = bat.lineup[(bat.bi + 8) % 9];
+    bases[1] = { p: gs.p, rec: fld.cur, slot: gs };
+  }
   let first = true;
   while (outs < 3) {
     if (!top && inning >= 9 && g.score[1] > g.score[0]) break;
@@ -169,6 +176,7 @@ function halfInning(g, bat, fld, inning) {
     const runsBefore = g.score[bat.idx];
     const res = doPA(b, rec, fld, bat);
     rec.pc += res.pc;
+    rec.bf++;
     b.stats.pa++;
     const runner = { p: b, rec, slot };
     let desc = '', code = res.t;
@@ -267,9 +275,10 @@ function halfInning(g, bat, fld, inning) {
   return runs;
 }
 
-function playGame(S, home, away, wantLog, wantPbp) {
+// opts.post：ポストシーズン（延長の二塁走者なし）・opts.asg：オールスター（9 回で同点ならホームラン競争で決める）
+function playGame(S, home, away, wantLog, wantPbp, opts = {}) {
   const A = prepareSide(S, away, 0), H = prepareSide(S, home, 1);
-  const g = { score: [0, 0], line: [[], []], log: wantLog ? [] : null, innings: 0, pbp: wantPbp ? [] : null };
+  const g = { score: [0, 0], line: [[], []], log: wantLog ? [] : null, innings: 0, pbp: wantPbp ? [] : null, ghost: !opts.post && !opts.asg };
   // 引き分けなし。延長は決着がつくまで（人の言葉 2026-11-20 案3「この案で決める」）。30 回は無限に回さないための止め（仮・AI）
   for (let inn = 1; inn <= 30; inn++) {
     g.line[0].push(halfInning(g, A, H, inn));
@@ -277,6 +286,12 @@ function playGame(S, home, away, wantLog, wantPbp) {
     g.line[1].push(halfInning(g, H, A, inn));
     g.innings = inn;
     if (inn >= 9 && g.score[0] !== g.score[1]) break;
+    if (opts.asg && inn >= 9) { // オールスターは延長をせず、ホームラン競争（各チームの長打の打者 3 人）で決める（本物の決まり。2022 年から）
+      const pw = s => U.sum(s.lineup.map(x => x.p.a.power).sort((a, b) => b - a).slice(0, 3)) + U.gauss() * 15;
+      g.score[pw(H) >= pw(A) ? 1 : 0]++;
+      g.swing = true;
+      break;
+    }
   }
   if (g.log && g.score[1] > g.score[0] && g.line[1][g.line[1].length - 1] !== 'X') {
     g.log.push({ t: 'ev', s: 'サヨナラ勝ち！' });
@@ -343,6 +358,7 @@ function playGame(S, home, away, wantLog, wantPbp) {
   }
   if (wantLog) {
     res.detail = {
+      swing: !!g.swing,
       line: g.line, log: g.log, innings: g.innings,
       hits: [U.sum(H.used, r => r.h), U.sum(A.used, r => r.h)],
       bat: [A, H].map(s => s.lineup.map(sl => ({ name: sl.p.name, pos: sl.pos, ...sl.box }))),

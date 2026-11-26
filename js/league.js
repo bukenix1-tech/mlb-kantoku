@@ -177,17 +177,32 @@ function daysUntilEligible(p) {
   return Math.max(0, p.downDay + rereg(p) - S.day);
 }
 // オプション：40 人枠の選手をマイナーに下ろせるのは 3 シーズンまで（同じシーズンなら何度でも）
-function canOption(p) { return p.optYear === S.year || (p.opt || 0) < OPTION_YEARS; }
+// 1 シーズンに下ろせるのは 5 回まで（本物の決まり。2022 年から）
+function canOption(p) { return p.optYear === S.year ? (p.optN || 0) < OPTION_PER_SEASON : (p.opt || 0) < OPTION_YEARS; }
 function optionsLeft(p) { return Math.max(0, OPTION_YEARS - (p.opt || 0)); }
-function useOption(p) { if (p.optYear === S.year) return; p.opt = (p.opt || 0) + 1; p.optYear = S.year; }
+function useOption(p) {
+  if (p.optYear !== S.year) { p.opt = (p.opt || 0) + 1; p.optYear = S.year; p.optN = 0; }
+  p.optN = (p.optN || 0) + 1;
+}
 
-// 26 人枠に上げられないときは理由を返す
-function cannotPromote(t, p) {
+// ポストシーズンに出られるか：8 月 31 日の終わりに、その球団にいた選手だけ（本物の決まり。8 月 31 日に 40 人枠・60 日の負傷者リストにいた選手。
+// マイナーの選手は申し立てでケガ人の代わりに入れるので、ここでは 8 月 31 日に球団にいれば出られることにした・仮・AI）
+function postEligible(t, p) { return S.phase !== 'post' || (!!p.postElig && p.postElig.y === S.year && p.postElig.t === t.id); }
+// 8 月 31 日の終わりの顔ぶれを残す（短いシーズンで 9 月がなければ、レギュラーシーズンの終わり）
+function snapPostElig() {
+  if (S.postElig === S.year) return;
+  S.postElig = S.year;
+  S.teams.forEach(t => teamPlayers(t).forEach(p => { p.postElig = { y: S.year, t: t.id }; }));
+}
+
+// 26 人枠に上げられないときは理由を返す。forInj：ケガ人の代わりなら、下ろして 10 日たっていなくても上げられる（本物の決まり）
+function cannotPromote(t, p, forInj) {
   if (isActive(t, p)) return '26人枠にいます';
   if (p.inj) return '故障中';
+  if (!postEligible(t, p)) return '8月31日に球団にいなかったので、ポストシーズンに出られない';
   if (t.active.length >= activeMax()) return '26人枠が満員';
   if (p.isP && !p.twoWay && activePlayers(t).filter(x => x.isP && !x.twoWay).length >= pMax()) return `投手は${pMax()}人まで`;
-  const d = daysUntilEligible(p);
+  const d = forInj ? 0 : daysUntilEligible(p);
   if (d > 0) return `再登録まであと${d}日`;
   if (!p.on40 && count40(t) >= FORTY_MAX) return '40人枠が満員';
   return null;
@@ -213,7 +228,7 @@ function demote(t, p) {
 // 26 人枠をおまかせで選ぶ（40 人枠の中から）：投手 13 人（先発 5 ＋ リリーフ 8）、野手 13 人（捕手は 2 人以上）
 function autoActive(t) {
   const max = activeMax(), pm = pMax();
-  const all = fortyOf(t).filter(p => !p.inj && (isActive(t, p) || daysUntilEligible(p) === 0));
+  const all = fortyOf(t).filter(p => !p.inj && postEligible(t, p) && (isActive(t, p) || daysUntilEligible(p) === 0));
   const chosen = [];
   let nP = 0;
   const take = p => {
@@ -266,7 +281,7 @@ function fillActive(t) {
 function ensureEnoughActive(t) {
   const healthy = isP => activePlayers(t).filter(p => p.isP === isP && !p.inj).length;
   const up = isP => {
-    const ok = p => p.isP === isP && !p.inj && !isActive(t, p) && daysUntilEligible(p) === 0;
+    const ok = p => p.isP === isP && !p.inj && !isActive(t, p) && daysUntilEligible(p) === 0 && postEligible(t, p);
     let c = fortyOf(t).filter(ok).sort((a, b) => ovr(b) - ovr(a))[0];
     if (!c && count40(t) < FORTY_MAX) c = minorsOf(t).filter(ok).sort((a, b) => ovr(b) - ovr(a))[0];
     if (!c) return false;
@@ -289,7 +304,7 @@ function injuryReplace(t, p) {
   demote(t, p);
   p.il = true;
   if (p.inj > IL60_DAYS && p.on40) p.il60 = true; // 60 日の負傷者リストは 40 人枠に数えない
-  const ok = x => x.isP === p.isP && !cannotPromote(t, x);
+  const ok = x => x.isP === p.isP && !cannotPromote(t, x, true);
   const sub = fortyOf(t).filter(ok).sort((a, b) => ovr(b) - ovr(a))[0]
     || (t.id !== S.myTeamId || count40(t) < FORTY_MAX ? minorsOf(t).filter(ok).sort((a, b) => ovr(b) - ovr(a))[0] : null);
   if (sub) promote(t, sub);
@@ -683,6 +698,7 @@ function advanceDay() {
   if (entry.allstar) allStarDay(entry.allstar);
   // 9 月からは 26 人枠が 28 人に広がる
   if (entry.m >= 9 && S.septUp !== S.year) {
+    snapPostElig(); // 8 月 31 日の終わりの顔ぶれ（ポストシーズンに出られる選手）
     S.septUp = S.year;
     S.teams.forEach(t => { const n = fillActive(t); if (t.id === S.myTeamId) addNews(`9月になり、26人枠が${ACTIVE_MAX_SEPT}人に広がりました${n ? `（${n}人を上げました）` : ''}。`); });
   }
@@ -816,17 +832,25 @@ function randomEvent() {
 
 // ---------- 順位・成績 ----------
 function pct(t) { const n = t.w + t.l; return n ? t.w / n : 0; }
-// 直接対決の勝ち数（その年の日程から数える。その日のうちは使い回す）
+// 直接対決の勝ち数と、リーグの中の試合・オールスター後のリーグの中の試合の勝ち負け（その年の日程から数える。その日のうちは使い回す）
 let h2hCache = { key: '', m: {} };
 function h2hTable() {
   const key = `${S.year}:${S.day}:${S.phase}:${S.post ? S.post.day : 0}`;
   if (h2hCache.key === key) return h2hCache.m;
-  const m = {};
-  (S.schedule || []).forEach(e => e.games.forEach(g => {
-    if (!g.score || g.score[0] === g.score[1]) return;
-    const w = g.score[1] > g.score[0] ? g.home : g.away, l = w === g.home ? g.away : g.home;
-    m[w] = m[w] || {}; m[w][l] = (m[w][l] || 0) + 1;
-  }));
+  const m = { rec: {} };
+  const rec = id => (m.rec[id] = m.rec[id] || { lw: 0, ll: 0, hw: 0, hl: 0 });
+  let afterAS = false;
+  (S.schedule || []).forEach(e => {
+    if (e.allstar) afterAS = true;
+    e.games.forEach(g => {
+      if (!g.score || g.score[0] === g.score[1]) return;
+      const w = g.score[1] > g.score[0] ? g.home : g.away, l = w === g.home ? g.away : g.home;
+      m[w] = m[w] || {}; m[w][l] = (m[w][l] || 0) + 1;
+      if (S.teams[w].lg !== S.teams[l].lg) return;
+      rec(w).lw++; rec(l).ll++;
+      if (afterAS) { rec(w).hw++; rec(l).hl++; }
+    });
+  });
   h2hCache = { key, m };
   return m;
 }
@@ -837,10 +861,30 @@ function divPct(m, t) {
   S.teams.forEach(o => { if (o.id !== t.id && o.lg === t.lg && o.div === t.div) { w += h2h(m, t.id, o.id); l += h2h(m, o.id, t.id); } });
   return w + l ? w / (w + l) : 0;
 }
-// 並べ方：勝率 → 直接対決 → 地区の中の勝率 → 得失点差（人の言葉 2026-11-20 案3）
+// 並べ方：勝率。同じ勝率なら breakTie（本物の決まり）
 function sortTeams(arr) {
   const m = h2hTable();
-  return arr.slice().sort((a, b) => pct(b) - pct(a) || (h2h(m, b.id, a.id) - h2h(m, a.id, b.id)) || divPct(m, b) - divPct(m, a) || (b.rs - b.ra) - (a.rs - a.ra));
+  const byPct = arr.slice().sort((a, b) => pct(b) - pct(a));
+  const out = [];
+  for (let i = 0; i < byPct.length;) {
+    let j = i;
+    while (j < byPct.length && pct(byPct[j]) === pct(byPct[i])) j++;
+    out.push(...breakTie(byPct.slice(i, j), m));
+    i = j;
+  }
+  return out;
+}
+// 同じ勝率の球団の並べ方。本物のメジャーの決まり（2022 年から。順位決定の試合はしない）に合わせた：
+// 直接対決（3 球団以上なら、同じ勝率のほかの球団みんなとの合計の勝率）→ 地区の中の勝率 → リーグの中の勝率 → オールスター後のリーグの中の勝率 → くじ
+// 出典: https://www.mlb.com/news/mlb-playoff-tiebreaker-rules 。3 球団以上の細かい決まり（2 球団ともに勝ち越した球団を先に）は、合計の勝率で近く寄せた（仮・AI）
+function breakTie(g, m) {
+  if (g.length < 2) return g;
+  const rate = (w, l) => (w + l ? w / (w + l) : 0.5);
+  const vsGroup = t => { let w = 0, l = 0; g.forEach(o => { if (o !== t) { w += h2h(m, t.id, o.id); l += h2h(m, o.id, t.id); } }); return rate(w, l); };
+  const r = t => m.rec[t.id] || { lw: 0, ll: 0, hw: 0, hl: 0 };
+  const lot = t => { const x = Math.sin(t.id * 91.7 + S.year * 13.1) * 43758.5; return x - Math.floor(x); }; // くじ（その年のうちは同じ結果）
+  const keys = [vsGroup, t => divPct(m, t), t => rate(r(t).lw, r(t).ll), t => rate(r(t).hw, r(t).hl), lot];
+  return g.slice().sort((a, b) => { for (const k of keys) { const d = k(b) - k(a); if (Math.abs(d) > 1e-9) return d; } return 0; });
 }
 // 順位表（lg だけならリーグ全体、div もあれば地区）
 function standings(lg, div) {
@@ -968,6 +1012,7 @@ function endRegular() {
   addServiceTime();
   growApt();
   settleMoney();
+  snapPostElig();
   // 過去の順位として残す（地区ごと）
   if (!S.standHist) S.standHist = [];
   const snap = {};
@@ -1007,6 +1052,16 @@ function endRegular() {
   updateSeasonRecords();
   // シーズン終わりからポストシーズンまで少しあく
   Object.values(S.players).forEach(p => { p.rest += 2; p.fatigue = 0; });
+  // ポストシーズンは 26 人枠（投手 13 人まで）に戻す。8 月 31 日にいなかった選手は外す（本物の決まり）
+  S.teams.forEach(t => {
+    const out = activePlayers(t).filter(p => !postEligible(t, p));
+    t.active = t.active.filter(id => !out.some(p => p.id === id));
+    if (t.id === S.myTeamId) {
+      trimActive(t); fillActive(t);
+      if (out.length) addNews(`${out.map(p => p.name).join('・')}は8月31日に球団にいなかったので、ポストシーズンの26人枠から外しました。`, 'bad');
+    } else autoActive(t);
+    ensureLineup(S, t);
+  });
   S.post = { stage: 'wc', series: [], awards, b9, gg, seeds, day: 0, champ: null };
   LEAGUES.forEach(lg => {
     const s = seeds[lg];
@@ -1123,7 +1178,7 @@ function allStarDay(n) {
   const ps = [...home.players, ...away.players].map(id => S.players[id]);
   const saved = ps.map(p => ({ stats: p.stats, rest: p.rest, fatigue: p.fatigue, role: p.role }));
   ps.forEach(p => { p.stats = newStats(); p.rest = 7; p.fatigue = 0; });
-  const res = playGame(S, home, away, false);
+  const res = playGame(S, home, away, true, false, { asg: true });
   // 活躍した選手に点を付けて MVP を決める（勝ったほうに少し足す）
   const won = res.score[1] > res.score[0] ? 1 : res.score[0] > res.score[1] ? 0 : -1;
   let best = null, bv = 0;
@@ -1139,7 +1194,7 @@ function allStarDay(n) {
   });
   ps.forEach((p, i) => Object.assign(p, saved[i]));
   A.games.push({ home: hl, score: res.score, star: best ? best.name : null });
-  addNews(`オールスター：全${LEAGUE_SHORT[al]} ${res.score[0]} - ${res.score[1]} 全${LEAGUE_SHORT[hl]}`, 'big');
+  addNews(`オールスター：全${LEAGUE_SHORT[al]} ${res.score[0]} - ${res.score[1]} 全${LEAGUE_SHORT[hl]}${res.detail.swing ? '（9 回で同点、ホームラン競争で決着）' : ''}`, 'big');
   if (n === 1) { // オールスターは 1 試合（人の言葉 2026-11-20 案2）
     const id = Object.keys(A.pts).sort((a, b) => A.pts[b] - A.pts[a])[0];
     const p = id && S.players[id];
@@ -1168,7 +1223,7 @@ function playPostGame(home, away, wantLog, wantPbp) {
   const ps = [...home.players, ...away.players].map(id => S.players[id]);
   const saved = ps.map(p => p.stats);
   ps.forEach(p => { p.stats = newStats(); });
-  const res = playGame(S, home, away, wantLog, wantPbp);
+  const res = playGame(S, home, away, wantLog, wantPbp, { post: true });
   ps.forEach((p, i) => { p.stats = saved[i]; });
   return res;
 }

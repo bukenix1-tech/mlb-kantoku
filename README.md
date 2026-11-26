@@ -23,6 +23,9 @@ python -m http.server 8794 --bind 127.0.0.1
 - **契約**：サービスタイム（172 日で 1 年）。調停前・年俸調停（スーパー 2・ノンテンダー）・FA（QO と補償の指名権）。契約は最大 10 年
 - **ドラフト**：7 月。ロッタリー（上位 6 番）、10 巡目まで、契約金の枠。高校生は断って大学へ進むことがある
 - **オフ**：表彰 → QO・FA → ノンテンダー → ルール 5 → 年俸調停 → 国際アマ（16 歳）・アジアのプロからのポスティング → スプリングトレーニング
+- **本物の決まり**（2026-11-26 に調べて入れた）：同じ勝率は直接対決 → 地区の中 → リーグの中 → オールスター後のリーグの中 → くじで並べ、順位決定の試合はしない。延長は 10 回から二塁に走者（レギュラーシーズンだけ）。投手は 3 人以上と対戦するか回を終えるまで代えない。オールスターは 9 回で同点ならホームラン競争。ポストシーズンは 8 月 31 日に球団にいた選手だけで 26 人枠。オプションは 1 シーズン 5 回まで。ケガ人の代わりなら下ろして 10 日たたずに戻せる
+  - 【出典】https://www.mlb.com/news/mlb-playoff-tiebreaker-rules ・ https://www.mlb.com/glossary/rules/designated-runner ・ https://www.mlb.com/glossary/rules/three-batter-minimum ・ https://www.mlb.com/glossary/transactions/postseason-roster-rules-eligibility ・ https://en.wikipedia.org/wiki/Major_League_Baseball_transactions
+  - 【AI の見立て】まだ入れていない本物の決まり：野手の登板の決まり（このゲームでは野手が投げない）・二刀流の登録の条件・投球の時計（1 球ずつは計算しない）・8 月 31 日のあとにマイナーの選手を入れる申し立ての細かい決まり
 
 ## 測った結果
 

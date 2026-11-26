@@ -899,8 +899,8 @@ function renderRoster() {
     <p>26人枠 <b>${act.length}/${activeMax()}人</b>（投手${act.filter(p => p.isP && !p.twoWay).length}/${pMax()}・野手${act.filter(p => !p.isP).length}）・ 40人枠 <b>${count40(t)}/${FORTY_MAX}</b>${teamPlayers(t).some(p => p.il60) ? `（ほかに 60日IL ${teamPlayers(t).filter(p => p.il60).length}人）` : ''} ・ マイナー契約 ${minors.length}人 ・ 全体 ${t.players.length}/${ROSTER_MAX}</p>
     ${prob ? `<p class="neg">⚠️ ${h(prob)}</p>` : ''}
     <p class="muted">試合に出られるのは 26 人枠だけ（9 月からは 28 人・投手は ${P_MAX_SEPT} 人まで）。26 人枠に上げられるのは 40 人枠の選手で、マイナー契約の選手を上げると 40 人枠にも入ります。
-      40 人枠の選手をマイナーへ下ろすと<b>オプション</b>を使います（${OPTION_YEARS} シーズンまで。同じシーズンなら何度でも）。オプションが残っていない選手は、40 人枠から外す（DFA）しかありません。
-      下ろした選手は ${REREGISTER.B} 日（投手は ${REREGISTER.P} 日）たつまで戻せません。ケガをした 26 人枠の選手は負傷者リスト（IL）へ。${IL60_DAYS} 日より長いケガは 60 日の負傷者リストで、40 人枠に数えません。</p>
+      40 人枠の選手をマイナーへ下ろすと<b>オプション</b>を使います（${OPTION_YEARS} シーズンまで。同じシーズンの中では ${OPTION_PER_SEASON} 回まで）。オプションが残っていない選手は、40 人枠から外す（DFA）しかありません。
+      下ろした選手は ${REREGISTER.B} 日（投手は ${REREGISTER.P} 日）たつまで戻せません（ケガ人の代わりなら戻せます）。ポストシーズンに出られるのは、8 月 31 日に球団にいた選手だけです。ケガをした 26 人枠の選手は負傷者リスト（IL）へ。${IL60_DAYS} 日より長いケガは 60 日の負傷者リストで、40 人枠に数えません。</p>
     <div class="po-hint">${hint}</div>
     <div class="ro-wrap">
       <div class="ro-col ro-act"><h2>26人枠</h2>${group(act.filter(p => p.isP), '投手')}${group(act.filter(p => !p.isP), '野手')}</div>
@@ -991,7 +991,7 @@ function renderStand() {
     <div class="seg">${LEAGUES.map(l => `<button class="${l === lg ? 'on' : ''}" data-act="lg" data-lg="${l}">${LEAGUE_NAME[l]}</button>`).join('')}</div></div>
     <div class="grid3">${DIVS.map(dv => `<div><h3>${dv}地区</h3>${standTable(standings(lg, dv), true)}</div>`).join('')}</div>
     <h3>ワイルドカード争い</h3>${wcTable(lg, false)}
-    <p class="muted small">各リーグ、地区優勝の 3 球団とワイルドカードの 3 球団がポストシーズンに出ます。同じ勝率なら直接対決、それも同じなら地区の中の勝率で決めます。</p>
+    <p class="muted small">各リーグ、地区優勝の 3 球団とワイルドカードの 3 球団がポストシーズンに出ます。同じ勝率なら、順位決定の試合はせず、直接対決 → 地区の中の勝率 → リーグの中の勝率 → オールスター後のリーグの中の勝率の順で決めます。延長は 10 回から二塁に走者を置いて始めます（ポストシーズンは置きません）。</p>
   </section>
   <section class="card"><h2>個人成績トップ5（${LEAGUE_NAME[lg]}）</h2>
     <p class="muted">打率は${Math.ceil(gp * 3.1)}打席以上、防御率は${gp}回以上が対象</p>
